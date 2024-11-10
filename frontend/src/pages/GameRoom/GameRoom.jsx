@@ -168,6 +168,8 @@ const GameArea = ({
       );
 
       // Update both the ref and the state
+
+      console.log("Player list:", playerJson);
       playerListRef.current = playerJson;
       setPlayerList(playerJson);
       setGameStage(tempRoomStatus.gameState);
@@ -456,7 +458,7 @@ const GameArea = ({
 
     // Start the initial flow
 
-     // controlGameFlow();
+     controlGameFlow();
   
 
     // Cleanup function

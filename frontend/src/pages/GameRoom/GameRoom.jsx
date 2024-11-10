@@ -433,7 +433,7 @@ const GameArea = ({
                 key={index}
                 number={cardNumber}
                 isHidden={false}
-                isSelfCard={false}
+                isSelfCard={true}
                 gameID="" // Not needed for display
               />
             ))}

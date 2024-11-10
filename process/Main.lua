@@ -490,3 +490,244 @@ Handlers.add(
         msg.reply({ Data = response })
     end
 )
+
+Handlers.add("PassCard", "PassCard", function(msg)
+    -- Validate input parameters
+if not msg.Tags.gameID or not msg.Tags.cardNumber then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Please provide both gameID and cardNumber'}"
+    })
+    return
+end
+local gameID = msg.Tags.gameID
+local cardNumber = msg.Tags.cardNumber
+
+    -- Validate card number
+if not (cardNumber == '0' or cardNumber == '1' or cardNumber == '2' or cardNumber == '3' or cardNumber == '4') then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Invalid card number'}"
+    })
+    return
+end
+
+    -- Get room status and validate game state
+local roomInfo = getRoomStatus(gameID)
+if not roomInfo then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Game room not found'}"
+    })
+    return
+end
+if roomInfo.GameState ~= "ON-GOING" then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Game is not on-going'}"
+    })
+    return
+end
+
+    -- Check if player is in game
+local playerFound = false
+for player in string.gmatch(roomInfo.PlayerString, "[^,]+") do
+    if player == msg.From then
+        playerFound = true
+        break
+    end
+end
+if not playerFound then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'You are not a part of this game'}"
+    })
+    return
+end
+
+    -- Get moves and validate
+local moves = getMovesFromGameID(gameID)
+if type(moves) == "string" then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Could not retrieve game moves'}"
+    })
+    return
+end
+local lastMove = moves[#moves]
+
+    -- Parse current card state
+local cardStates = {}
+local index = 1
+for card in string.gmatch(lastMove.CardState, "[^,]+") do
+    cardStates[index] = card
+    index = index + 1
+end
+
+    -- Get players list
+local players = {}
+index = 1
+for player in string.gmatch(roomInfo.PlayerString, "[^,]+") do
+    players[index] = player
+    index = index + 1
+end
+
+    -- Find current player index based on move number
+local currentPlayerIndex
+if lastMove.MoveNumber == 1 then
+    for i, cards in ipairs(cardStates) do
+        if #cards == 5 then
+            currentPlayerIndex = i
+            break
+        end
+    end
+else
+    for i, player in ipairs(players) do
+        if player == lastMove.toPlayer then
+            currentPlayerIndex = i
+            break
+        end
+    end
+end
+
+if msg.From ~= players[currentPlayerIndex] then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'It is not your turn'}"
+    })
+    return
+end
+
+    -- Get valid cards for current player
+local currentPlayerCards = cardStates[currentPlayerIndex]
+local validCards = {}
+for i = 1, #currentPlayerCards do
+    validCards[i] = currentPlayerCards:sub(i, i)
+end
+
+    -- Handle first move restriction (can't pass 0)
+if lastMove.MoveNumber == 1 then
+    for i, card in ipairs(validCards) do
+        if card == '0' then
+            table.remove(validCards, i)
+            break
+        end
+    end
+else
+        -- Check if player is trying to pass the last received card
+    local receivedCard = tostring(lastMove.CardPassed)
+    for i, card in ipairs(validCards) do
+        if card == receivedCard then
+            table.remove(validCards, i)
+            break
+        end
+    end
+end
+
+    -- Validate chosen card
+local validCard = false
+for _, card in ipairs(validCards) do
+    if card == cardNumber then
+        validCard = true
+        break
+    end
+end
+if not validCard then
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Cannot pass this card'}"
+    })
+    return
+end
+
+    -- Find next player
+local nextPlayerIndex = (currentPlayerIndex % 4) + 1
+local nextPlayer = players[nextPlayerIndex]
+
+    -- Update card states
+cardStates[currentPlayerIndex] = cardStates[currentPlayerIndex]:gsub(cardNumber, "", 1)
+cardStates[nextPlayerIndex] = cardStates[nextPlayerIndex] .. cardNumber
+
+
+    -- Create new card state string
+local newCardState = table.concat(cardStates, ",")
+-- cardStates = [4333, 1123, 42034,24334]
+local success, err = pcall(function()
+        -- Insert new move
+    admin:apply(
+            string.format([[
+                INSERT INTO Game_%d 
+                (Player, toPlayer, CardPassed, CardState) 
+                VALUES (?, ?, ?, ?);
+            ]], gameID), {
+        msg.From,
+        nextPlayer,
+        cardNumber,
+        newCardState
+    })
+
+    -- Check for winner
+    local cardStatesTemp = {}
+    for i, card in ipairs(cardStates) do
+        local stringNum = string.gsub(card, "%s+", "")
+
+        cardStatesTemp[i] = tonumber(stringNum)
+    end 
+
+
+
+    for i, cards in ipairs(cardStatesTemp) do
+        -- Find player with 5 cards
+        stringCards = tostring(cards)
+        if #stringCards == 5 then
+            -- Count frequency of each card type
+            local cardCount = {['0'] = 0, ['1'] = 0, ['2'] = 0, ['3'] = 0, ['4'] = 0}
+            
+            -- Count each card
+            for j = 1, 5 do
+                local card = stringCards:sub(j,j)
+                cardCount[card] = cardCount[card] + 1
+            end
+            
+            
+
+            -- Check if any card type (except 0) appears 4 times
+            for cardType = 1, 4 do
+                local stringCardType = tostring(cardType)
+                if cardCount[stringCardType] == 4 then
+                    local pointsToGive = CARD_VALUE[stringCardType]
+                    admin:apply(
+                        [[UPDATE GameRooms 
+                          SET GameState = 'COMPLETED', 
+                              Result = 1, 
+                              Winner = ?,
+                              PointsGiven = ?
+                          WHERE GameID = ?;]], 
+                        { players[i], pointsToGive, gameID }
+                    )
+                    
+                    local winResponse = string.format(
+                        "{'status': 'success', 'message': 'Game Over!', " ..
+                        "'winner': '%s', 'points': %d, 'finalState': '%s'}",
+                        players[i], pointsToGive, newCardState
+                    )
+                    receipientList = getPlayers(gameID)
+                    for _, recipient in ipairs(receipientList) do
+                        ao.send({Target = recipient, Data = winResponse})
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+        -- If no winner, return success message
+    local response = string.format(
+        "{'status': 'success', 'message': 'Card passed successfully', " ..
+        "'from': '%s', 'to': '%s', 'card': '%s', 'newState': '%s'}", 
+        msg.From, nextPlayer, cardNumber, newCardState
+    )
+    receipientList = getPlayers(gameID)
+    for _, recipient in ipairs(receipientList) do
+        ao.send({Target = recipient, Data = response})
+    end
+end)
+if not success then
+    msg.reply({Data = err})
+    msg.reply({
+        Data = "{'status': 'error', 'message': 'Failed to process move. Please try again.'}"
+    })
+end
+end)

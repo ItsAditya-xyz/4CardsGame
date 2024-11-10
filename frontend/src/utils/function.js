@@ -81,7 +81,7 @@ export async function getSelfCards(gameID, arweaveWindow) {
   try {
     // First, send the message
 
-    console.log("get s elf cards called")
+    console.log("get s elf cards called");
 
     console.log(arweaveWindow);
     const messageRes = await message({
@@ -101,11 +101,11 @@ export async function getSelfCards(gameID, arweaveWindow) {
       message: messageRes,
       // the arweave TXID of the process
       process: PROCESS_ID,
-    }); 
-   console.log(Messages,Spawns, Output, Error )
+    });
+    console.log(Messages, Spawns, Output, Error);
     const dataTemp = Messages[0].Data;
-    console.log(dataTemp)
-    const parsedJsonData = parseCustomJson(dataTemp)
+    console.log(dataTemp);
+    const parsedJsonData = parseCustomJson(dataTemp);
     return parsedJsonData;
   } catch (error) {
     console.error("Error in getSelfCards:", error);
@@ -205,4 +205,36 @@ export async function GetCurrentTurnDryRun(gameID) {
 
   const parsedMessages = parseCustomJson(data);
   return parsedMessages;
+}
+
+export async function passCard(gameID, cardID, arweaveWindow) {
+  try {
+    // First, send the message
+    const messageRes = await message({
+      process: PROCESS_ID,
+      tags: [
+        { name: "gameID", value: `${gameID}` },
+        { name: "Action", value: "PassCard" },
+        { name: "cardNumber", value: `${cardID}` },
+      ],
+      signer: nodeCDIS(arweaveWindow),
+      data: "",
+    });
+
+    let { Messages, Spawns, Output, Error } = await result({
+      // the arweave TXID of the message
+      message: messageRes,
+      // the arweave TXID of the process
+      process: PROCESS_ID,
+    });
+    console.log(Messages, Spawns, Output, Error);
+    const dataTemp = Messages[0].Data;
+    console.log(dataTemp);
+    const parsedJsonData = parseCustomJson(dataTemp);
+    return parsedJsonData;
+  
+  } catch (error) {
+    console.error("Error in passCard:", error);
+    throw error; // Re-throw the error so the caller can handle it
+  }
 }

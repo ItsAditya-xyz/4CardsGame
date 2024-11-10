@@ -4,7 +4,7 @@ import Arweave from "arweave";
 import { message, results } from "@permaweb/aoconnect";
 import { createDataItemSigner as nodeCDIS } from "@permaweb/aoconnect/node";
 import { useNavigate } from "react-router";
-
+import toast, { Toaster } from "react-hot-toast";
 import { useRef, useEffect } from "react";
 import {
   GetCurrentTurn,
@@ -15,6 +15,7 @@ import {
   getUserInfo,
   getUserInfoDryRun,
   parseCustomJson,
+  passCard,
 } from "../../utils/function";
 import bunny from "../../assets/bunny.jpg";
 import cat from "../../assets/cat.jpg";
@@ -23,7 +24,6 @@ import panda from "../../assets/panda.jpg";
 import nullImage from "../../assets/Null.png";
 import React from "react";
 import Loader from "../../Components/Loader";
-import toast from "react-hot-toast";
 const GameChat = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -100,16 +100,14 @@ const GameArea = ({
   password,
   isRoomCreator,
   arweaveWindow,
-  selfAddress
+  selfAddress,
 }) => {
-  console.log(roomInfo);
-
+  // console.log(roomInfo);
 
   const isRunningRef = useRef(false);
   const [playerList, setPlayerList] = useState({});
 
   const [isCopied, setIsCopied] = useState(false);
-
 
   const roomLink = `${window.location.origin}/room/${roomInfo.gameID}?c=${password}`;
 
@@ -122,8 +120,12 @@ const GameArea = ({
     roomInfo.gameState
   );
 
+
+  const [roomStatusFullData, setRoomStatusFullData] = useState(null);
   const playerListRef = useRef({});
   const timeoutRef = useRef(null);
+
+
 
   async function controlGameFlow() {
     // Prevent concurrent runs
@@ -139,7 +141,9 @@ const GameArea = ({
         console.error("Invalid room status");
         return;
       }
+      setRoomStatusFullData(tempRoomStatus);
 
+    
       const playerArray = tempRoomStatus.players
         ? tempRoomStatus.players.split(",")
         : [];
@@ -189,6 +193,12 @@ const GameArea = ({
 
           setSelfCards(tempCardList);
         }
+      } else if (tempRoomStatus.gateState === "COMPLETED") {
+        // Game completed
+        console.log("Game completed");
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
       }
     } catch (error) {
       console.error("Error in game flow:", error);
@@ -202,6 +212,18 @@ const GameArea = ({
     }
   }
 
+
+  useEffect(() => {
+
+    if(!roomStatusFullData){return}
+
+    console.log(roomStatusFullData)
+
+    if(roomStatusFullData.gameState === "COMPLETED"){
+      setIsLookingForPlayers("COMPLETED");
+    }
+
+  }, [roomStatusFullData]);
   const getPlayerPosition = (playerIndex, selfAddressIndex) => {
     // Calculate relative position based on player's index relative to self
     const positions = ["bottom", "left", "top", "right"];
@@ -241,7 +263,12 @@ const GameArea = ({
                   />
                   <div className='flex gap-1 md:gap-2 lg:gap-3'>
                     {[1, 2, 3, 4].map((_, cardIndex) => (
-                      <Card key={cardIndex} number={0} isHidden={true} />
+                      <Card
+                        key={cardIndex}
+                        number={0}
+                        isHidden={true}
+                        gameID={roomInfo.gameID}
+                      />
                     ))}
                   </div>
                 </div>
@@ -266,7 +293,12 @@ const GameArea = ({
                     />
                     <div className='flex gap-1 md:gap-2 lg:gap-3'>
                       {[1, 2, 3, 4].map((_, cardIndex) => (
-                        <Card key={cardIndex} number={0} isHidden={true} />
+                        <Card
+                          key={cardIndex}
+                          number={0}
+                          isHidden={true}
+                          gameID={roomInfo.gameID}
+                        />
                       ))}
                     </div>
                   </div>
@@ -296,7 +328,12 @@ const GameArea = ({
                     />
                     <div className='flex gap-1 md:gap-2 lg:gap-3'>
                       {[1, 2, 3, 4].map((_, cardIndex) => (
-                        <Card key={cardIndex} number={0} isHidden={true} />
+                        <Card
+                          key={cardIndex}
+                          number={0}
+                          isHidden={true}
+                          gameID={roomInfo.gameID}
+                        />
                       ))}
                     </div>
                   </div>
@@ -317,7 +354,12 @@ const GameArea = ({
                   className='flex flex-col items-center gap-2 md:gap-4'>
                   <div className='flex gap-1 md:gap-2 lg:gap-3'>
                     {selfCards.map((cardValue, cardIndex) => (
-                      <Card key={cardIndex} number={parseInt(cardValue)} />
+                      <Card
+                        key={cardIndex}
+                        number={parseInt(cardValue)}
+                        isSelfCard={true}
+                        gameID={roomInfo.gameID}
+                      />
                     ))}
                   </div>
                   <PlayerInfo
@@ -335,11 +377,87 @@ const GameArea = ({
     );
   };
 
+  const WinnerDisplay = ({ roomStatusFullData, playerList }) => {
+    // Extract winner info from roomStatusFullData
+    const winner = roomStatusFullData.winner;
+    const pointsGiven = parseInt(roomStatusFullData.pointsGiven);
+    
+    // Determine which set of cards was collected based on points
+    const getCollectedCardSet = (points) => {
+      switch(points) {
+        case 1000: // 4 Dogs (1000 points each)
+          return Array(4).fill(1);
+        case 850: // 4 Cats (850 points each)
+          return Array(4).fill(2);
+        case 700: // 4 Bunnies (700 points each)
+          return Array(4).fill(3);
+        case 500: // 4 Pandas (500 points each)
+          return Array(4).fill(4);
+        default:
+          return Array(4).fill(0);
+      }
+    };
+  
+    const collectedCards = getCollectedCardSet(pointsGiven);
+  
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-gray-800/50 rounded-lg p-8">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold text-white mb-2">Game Over!</h2>
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <div className="w-20 h-20 rounded-full overflow-hidden">
+              <img 
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${winner}`}
+                alt="Winner Avatar"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <p className="text-2xl text-white font-medium">
+                {playerList[winner]} Wins!
+              </p>
+              <p className="text-xl text-green-400">
+                {pointsGiven} Points
+              </p>
+            </div>
+          </div>
+        </div>
+  
+        <div className="text-center mb-8">
+          <h3 className="text-xl text-gray-300 mb-4">Winning Collection</h3>
+          <div className="flex justify-center gap-4">
+            {collectedCards.map((cardNumber, index) => (
+              <Card
+                key={index}
+                number={cardNumber}
+                isHidden={false}
+                isSelfCard={false}
+                gameID=""  // Not needed for display
+              />
+            ))}
+          </div>
+        </div>
+  
+        <div className="mt-8">
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg 
+                       transition-colors duration-200 font-medium"
+          >
+            Play Again
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (!roomInfo) return;
 
     // Start the initial flow
-    controlGameFlow();
+
+      controlGameFlow();
+  
 
     // Cleanup function
     return () => {
@@ -359,6 +477,8 @@ const GameArea = ({
   //   testScript();
   // }, [roomInfo]);
 
+  console.log(isLookingForPlayers)
+
   return (
     <div className='bg-gray-800 rounded-lg p-4 lg:p-8 h-full relative'>
       {!isLoading &&
@@ -369,12 +489,21 @@ const GameArea = ({
           </div>
         )}
 
+        
+
       {!isLoading &&
         isLookingForPlayers === "ON-GOING" &&
         Object.keys(playerList).length === 4 &&
         selfCards.length > 2 &&
         currentTurn.cards.length > 0 &&
         renderGameLayout()}
+
+
+{!isLoading &&
+        isLookingForPlayers === "COMPLETED" &&
+        Object.keys(playerList).length === 4 &&
+        WinnerDisplay({ roomStatusFullData, playerList })}
+
 
       {!isLoading &&
         isLookingForPlayers === "LOOKING FOR MEMBERS" &&
@@ -523,17 +652,45 @@ const GameArea = ({
   );
 };
 
-const Card = ({ number, isHidden = false }) => {
+const Card = ({ number, isHidden = false, isSelfCard = false, gameID }) => {
   const cardInfo = getCardImage(number);
 
+  const handleCardClick = async () => {
+    if (isSelfCard) {
+      const loadingToast = toast.loading(
+        `Passing card ${cardInfo.name} to next Player...`
+      );
+
+      const wallet = JSON.parse(localStorage.getItem("wallet"));
+      window.arweaveWallet = wallet;
+
+      const response = await passCard(gameID, number, window.arweaveWallet);
+      if (response.status === "error") {
+        toast.dismiss(loadingToast);
+        toast.error(response.message);
+      } else {
+        toast.dismiss(loadingToast);
+        toast.success("Card passed successfully!");
+
+        // if(response.message === "Game Over!"){
+        //   window.location.reload();
+        // }
+      }
+    }
+  };
+
   return (
-    <div className={`relative group cursor-pointer`}>
+    <div
+      className={`relative group ${isSelfCard ? "cursor-pointer" : ""}`}
+      onClick={handleCardClick}>
       {/* Card Container */}
       <div
         className={`
           w-12 h-20 md:w-20 md:h-32 lg:w-24 lg:h-40
           rounded-xl transform transition-all duration-300
-          group-hover:scale-105 group-hover:-translate-y-2
+          ${
+            isSelfCard ? "group-hover:scale-105 group-hover:-translate-y-2" : ""
+          }
           ${
             isHidden
               ? "bg-gradient-to-br from-blue-400 to-blue-600"
@@ -589,12 +746,16 @@ const Card = ({ number, isHidden = false }) => {
 
       {/* Card Glow Effect */}
       <div
-        className='absolute -inset-2 bg-gradient-to-r from-green-400 to-blue-500 
-                      rounded-xl opacity-0 group-hover:opacity-20 blur-xl transition-all 
-                      duration-300 -z-10'></div>
+        className={`absolute -inset-2 bg-gradient-to-r from-green-400 to-blue-500 
+                      rounded-xl opacity-0 ${
+                        isSelfCard ? "group-hover:opacity-20" : ""
+                      } blur-xl transition-all 
+                      duration-300 -z-10`}></div>
     </div>
   );
 };
+
+
 const PlayerInfo = ({ username, position, isCurrentPlayer }) => {
   return (
     <div
@@ -689,7 +850,7 @@ const GameRoom = () => {
       setIsRoomCreator(true);
     } else {
       // join room
-      const loadingToast = toast.loading("Registering username...");
+      const loadingToast = toast.loading("Joining Room...");
 
       // Send registration message
 
@@ -738,6 +899,7 @@ const GameRoom = () => {
 
   return (
     <div className='h-screen bg-gray-900 p-4'>
+      <Toaster />
       <div className='h-full flex flex-col'>
         {/* Game Layout */}
         <div className='flex-1 flex gap-4'>
@@ -757,7 +919,7 @@ const GameRoom = () => {
                 password={code}
                 isRoomCreator={isRoomCreator}
                 arweaveWindow={window.arweaveWallet}
-                selfAddress={address} 
+                selfAddress={address}
               />
             )}
           </div>

@@ -942,7 +942,7 @@ const GameRoom = () => {
           </div>
 
           {/* Chat Section - Fixed width */}
-          <div className="w-80">
+          <div className="hidden sm:block w-80">
             <GameChat />
           </div>
         </div>

@@ -309,7 +309,7 @@ const GameArea = ({
           </div>
 
           {/* Center area */}
-          <div className='w-20 h-20 md:w-28 md:h-28 lg:w-36 lg:h-36 rounded-full bg-gray-700/50 flex items-center justify-center'>
+          <div className='w-20 h-20 md:w-20 md:h-20 lg:w-32 lg:h-32 rounded-full bg-gray-700/50 flex items-center justify-center'>
             <span className='text-white text-xs md:text-sm lg:text-base'>
               Game Center
             </span>
@@ -456,7 +456,7 @@ const GameArea = ({
 
     // Start the initial flow
 
-      controlGameFlow();
+     // controlGameFlow();
   
 
     // Cleanup function
@@ -686,7 +686,7 @@ const Card = ({ number, isHidden = false, isSelfCard = false, gameID }) => {
       {/* Card Container */}
       <div
         className={`
-          w-12 h-20 md:w-20 md:h-32 lg:w-24 lg:h-40
+          w-12 h-20 md:w-20 md:h-32 lg:w-20 lg:h-36
           rounded-xl transform transition-all duration-300
           ${
             isSelfCard ? "group-hover:scale-105 group-hover:-translate-y-2" : ""

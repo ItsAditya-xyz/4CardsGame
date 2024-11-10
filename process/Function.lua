@@ -9,6 +9,34 @@ function generatePassword()
     return password
 end
 
+function getPlayers(gameID)
+    -- Query the database for players in the game room
+    local result = admin:select(
+        [[SELECT PlayerString 
+          FROM GameRooms
+          WHERE GameID = ?;]], 
+        { gameID }
+    )
+
+    -- Check if we got a result
+    if result and #result > 0 and result[1].PlayerString then
+        -- Assuming Players is stored as a comma-separated string
+        local playersString = result[1].PlayerString
+        local players = {}
+        
+        -- Split the comma-separated string into a table
+        for playerID in playersString:gmatch("[^,]+") do
+            -- Trim any whitespace and add to players table
+            playerID = playerID:match("^%s*(.-)%s*$")
+            table.insert(players, playerID)
+        end
+        
+        return players
+    end
+    
+    -- Return empty table if no players found
+    return {}
+end
 
 
 

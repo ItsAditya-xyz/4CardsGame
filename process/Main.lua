@@ -259,95 +259,7 @@ Handlers.add(
         end
     end
 )
-Handlers.add(
-    "GetCurrentTurn",
-    "GetCurrentTurn",
-    function(msg)
-        -- Validate input parameters
-        if not msg.Tags.gameID then
-            msg.reply({ Data = "{'status': 'error', 'message': 'Please provide gameID'}" })
-            return
-        end
 
-        local gameID = msg.Tags.gameID
-
-        -- Get room status
-        local roomInfo = getRoomStatus(gameID)
-        if not roomInfo then
-            msg.reply({ Data = "{'status': 'error', 'message': 'Game room not found'}" })
-            return
-        end
-
-        if roomInfo.GameState ~= "ON-GOING" then
-            msg.reply({ Data = "{'status': 'error', 'message': 'Game is not on-going'}" })
-            return
-        end
-
-        -- Get latest move to get card state
-        local moves = getMovesFromGameID(gameID)
-        if type(moves) == "string" then  -- Error case
-            msg.reply({ Data = "{'status': 'error', 'message': 'Could not retrieve game moves'}" })
-            return
-        end
-
-        local lastMove = moves[#moves]  -- Get the last move
-        local cardStates = {}
-        local index = 1
-        
-        -- Split the card states from the last move
-        for card in string.gmatch(lastMove.CardState, "[^,]+") do
-            cardStates[index] = card:gsub("%s+", "")  -- Remove whitespace
-            index = index + 1
-        end
-
-        -- Get players list
-        local players = {}
-        index = 1  -- Reuse index variable
-        for player in string.gmatch(roomInfo.PlayerString, "[^,]+") do
-            players[index] = player:gsub("%s+", "")
-            index = index + 1
-        end
-
-        -- Find player with 5 cards
-        local currentPlayerIndex = 0
-        for i, cards in ipairs(cardStates) do
-            if #cards == 5 then
-                currentPlayerIndex = i
-                break
-            end
-        end
-
-        if currentPlayerIndex == 0 then
-            msg.reply({ Data = "{'status': 'error', 'message': 'Invalid game state - no player with 5 cards'}" })
-            return
-        end
-
-        local currentPlayer = players[currentPlayerIndex]
-        
-        -- Get username from RegisteredPlayers
-        local playerInfo = admin:select(
-            "SELECT Name FROM RegisteredPlayers WHERE Address = ?;",
-            { currentPlayer }
-        )
-
-        if #playerInfo == 0 then
-            msg.reply({ Data = "{'status': 'error', 'message': 'Could not find player information'}" })
-            return
-        end
-
-        -- Return current player's address and username
-        local response = string.format(
-            "{'status': 'success', 'message': 'Current turn retrieved', " ..
-            "'player': '%s', 'username': '%s', 'cards': '%s', 'moveNumber': %d}",
-            currentPlayer,
-            playerInfo[1].Name,
-            cardStates[currentPlayerIndex],
-            lastMove.MoveNumber
-        )
-        
-        msg.reply({ Data = response })
-    end
-)
 
 Handlers.add(
     "GetCurrentTurn",
@@ -496,6 +408,85 @@ Handlers.add(
             "{'status': 'success', 'message': 'Cards retrieved', 'cards': '%s'}",
             myCards
         )
+        msg.reply({ Data = response })
+    end
+)
+
+
+Handlers.add(
+    "GetRoomStatus",
+    "GetRoomStatus",
+    function(msg)
+        -- Validate input parameter
+        if not msg.Tags.gameID then
+            msg.reply({ Data = "{'status': 'error', 'message': 'Please provide gameID'}" })
+            return
+        end
+
+        local gameID = msg.Tags.gameID
+
+        -- Get room status
+        local roomInfo = getRoomStatus(gameID)
+        
+        -- Check if room exists
+        if type(roomInfo) == "string" then
+            msg.reply({ Data = "{'status': 'error', 'message': 'Room not found'}" })
+            return
+        end
+
+        -- Format response with all room info
+        local response = string.format(
+            "{'status': 'success', " ..
+            "'gameID': '%s', " ..
+            "'players': '%s', " ..
+            "'gameState': '%s', " ..
+            "'result': '%s', " ..
+            "'winner': '%s', " ..
+            "'pointsGiven': '%s'}",
+            roomInfo.GameID,
+            roomInfo.PlayerString,
+            roomInfo.GameState,
+            roomInfo.Result or '',
+            roomInfo.Winner or '',
+            roomInfo.PointsGiven or ''
+        )
+
+        msg.reply({ Data = response })
+    end
+)
+
+Handlers.add(
+    "GetUserInfo",     -- Handler name
+    "GetUserInfo",     -- Process name
+    function(msg)
+        -- Check if address was provided
+        if not msg.Tags.address then
+            msg.reply({ Data = "{'status': 'error', 'message': 'Please provide an address with your request'}" })
+            return
+        end
+
+        -- Get the address from Tags
+        local address = msg.Tags.address
+        
+        -- Query the database for the username
+        local results = admin:select('SELECT Name FROM RegisteredPlayers WHERE Address = ?;', { address })
+        
+        local response
+        if #results > 0 then
+            -- User found, return their information
+            response = string.format(
+                "{'status': 'success', 'address': '%s', 'username': '%s'}",
+                address,
+                results[1].Name
+            )
+        else
+            -- User not found, return empty username
+            response = string.format(
+                "{'status': 'success', 'address': '%s', 'username': ''}",
+                address
+            )
+        end
+        
         msg.reply({ Data = response })
     end
 )

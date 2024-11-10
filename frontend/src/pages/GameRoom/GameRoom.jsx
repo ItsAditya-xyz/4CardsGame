@@ -901,8 +901,8 @@ const GameRoom = () => {
         toast.dismiss(loadingToast);
         toast.error(parsedJoinRoomData.message);
       
-        // sleep for 1 hour 
-        await new Promise(r => setTimeout(r, 3600000));
+        // // sleep for 1 hour 
+        // await new Promise(r => setTimeout(r, 3600000));
       }
     }
     setRoomStatus(tempRoomStatus);

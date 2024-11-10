@@ -458,7 +458,7 @@ const GameArea = ({
 
     // Start the initial flow
 
-   // controlGameFlow();
+   controlGameFlow();
 
     // Cleanup function
     return () => {

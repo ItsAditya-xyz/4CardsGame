@@ -100,44 +100,16 @@ const GameArea = ({
   password,
   isRoomCreator,
   arweaveWindow,
+  selfAddress
 }) => {
   console.log(roomInfo);
-  const [players, setPlayers] = useState([
-    {
-      id: 1,
-      username: "You",
-      position: "bottom",
-      cards: [1, 2, 3, 0, 4],
-      isCurrentPlayer: true,
-    },
-    {
-      id: 2,
-      username: "Player 2",
-      position: "right",
-      cards: [1, 1, 1, 1],
-      isCurrentPlayer: false,
-    },
-    {
-      id: 3,
-      username: "Player 3",
-      position: "top",
-      cards: [2, 2, 2, 2],
-      isCurrentPlayer: false,
-    },
-    {
-      id: 4,
-      username: "Player 4",
-      position: "left",
-      cards: [3, 3, 3, 3],
-      isCurrentPlayer: false,
-    },
-  ]);
+
 
   const isRunningRef = useRef(false);
   const [playerList, setPlayerList] = useState({});
 
   const [isCopied, setIsCopied] = useState(false);
-  const [selfAddress, setSelfAddress] = useState("");
+
 
   const roomLink = `${window.location.origin}/room/${roomInfo.gameID}?c=${password}`;
 
@@ -238,9 +210,16 @@ const GameArea = ({
   };
 
   const renderGameLayout = () => {
-    if (!playerList || Object.keys(playerList).length !== 4 || !selfCards) {
+    if (
+      !playerList ||
+      Object.keys(playerList).length !== 4 ||
+      !selfCards ||
+      !currentTurn
+    ) {
       return null;
     }
+
+    console.log(currentTurn);
 
     const addresses = Object.keys(playerList);
     const selfAddressIndex = addresses.indexOf(selfAddress);
@@ -258,7 +237,7 @@ const GameArea = ({
                   <PlayerInfo
                     username={playerList[address]}
                     position='top'
-                    isCurrentPlayer={currentTurn?.currentTurn === address}
+                    isCurrentPlayer={currentTurn.player === address}
                   />
                   <div className='flex gap-1 md:gap-2 lg:gap-3'>
                     {[1, 2, 3, 4].map((_, cardIndex) => (
@@ -283,7 +262,7 @@ const GameArea = ({
                     <PlayerInfo
                       username={playerList[address]}
                       position='left'
-                      isCurrentPlayer={currentTurn?.currentTurn === address}
+                      isCurrentPlayer={currentTurn.player === address}
                     />
                     <div className='flex gap-1 md:gap-2 lg:gap-3'>
                       {[1, 2, 3, 4].map((_, cardIndex) => (
@@ -313,7 +292,7 @@ const GameArea = ({
                     <PlayerInfo
                       username={playerList[address]}
                       position='right'
-                      isCurrentPlayer={currentTurn?.currentTurn === address}
+                      isCurrentPlayer={currentTurn.player === address}
                     />
                     <div className='flex gap-1 md:gap-2 lg:gap-3'>
                       {[1, 2, 3, 4].map((_, cardIndex) => (
@@ -344,7 +323,7 @@ const GameArea = ({
                   <PlayerInfo
                     username={playerList[address]}
                     position='bottom'
-                    isCurrentPlayer={currentTurn?.currentTurn === address}
+                    isCurrentPlayer={currentTurn.player === address}
                   />
                 </div>
               );
@@ -394,6 +373,7 @@ const GameArea = ({
         isLookingForPlayers === "ON-GOING" &&
         Object.keys(playerList).length === 4 &&
         selfCards.length > 2 &&
+        currentTurn.cards.length > 0 &&
         renderGameLayout()}
 
       {!isLoading &&
@@ -683,6 +663,7 @@ const GameRoom = () => {
     if (localStorage.getItem("wallet")) {
       const wallet = JSON.parse(localStorage.getItem("wallet"));
       addressTemp = localStorage.getItem("address");
+      setAddress(addressTemp);
       setWallet(wallet);
       window.arweaveWallet = wallet;
 
@@ -776,6 +757,7 @@ const GameRoom = () => {
                 password={code}
                 isRoomCreator={isRoomCreator}
                 arweaveWindow={window.arweaveWallet}
+                selfAddress={address} 
               />
             )}
           </div>

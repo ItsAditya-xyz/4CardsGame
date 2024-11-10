@@ -81,6 +81,8 @@ export async function getSelfCards(gameID, arweaveWindow) {
   try {
     // First, send the message
 
+    console.log("get s elf cards called")
+
     console.log(arweaveWindow);
     const messageRes = await message({
       process: PROCESS_ID,

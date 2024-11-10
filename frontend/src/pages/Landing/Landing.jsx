@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import Arweave from "arweave";
-import { message, results } from "@permaweb/aoconnect";
+import { message, result } from "@permaweb/aoconnect";
 import { createDataItemSigner as nodeCDIS } from "@permaweb/aoconnect/node";
 import { useNavigate } from "react-router";
 import { getUserInfoDryRun, parseCustomJson } from "../../utils/function";
@@ -72,8 +72,6 @@ export default function Landing() {
     let loadingToast;
     try {
       const wallet = JSON.parse(localStorage.getItem("wallet"));
-    
-
       window.arweaveWallet = wallet;
       if (!wallet) {
         toast.error("No wallet found. Please connect your wallet first");
@@ -86,9 +84,9 @@ export default function Landing() {
 
       loadingToast = toast.loading("Creating room...");
 
-      console.log("creating room")
+      console.log("creating room");
 
-      console.log(window.arweaveWallet)
+      console.log(window.arweaveWallet);
 
       const messageResult = await message({
         process: PROCESS_ID,
@@ -101,27 +99,15 @@ export default function Landing() {
         throw new Error("Failed to send registration message");
       }
 
-      // sleep for 3 seconds
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Get results
-      const resultsOut = await results({
+      let { Messages, Spawns, Output, Error } = await result({
+        // the arweave TXID of the message
+        message: messageResult,
+        // the arweave TXID of the process
         process: PROCESS_ID,
-        sort: "DESC",
-        limit: 1,
       });
 
-      console.log("Results from createRoom:", resultsOut);
-
-      if (
-        !resultsOut?.edges?.length ||
-        !resultsOut.edges[0]?.node?.Messages?.length
-      ) {
-        throw new Error("Invalid response from registration");
-      }
-
-      const resultData = resultsOut.edges[0].node.Messages[0].Data;
-      const jsonData = parseCustomJson(resultData);
+      const dataTemp = Messages[0].Data;
+      const jsonData = parseCustomJson(dataTemp);
 
       const messageText = jsonData.message;
       const gameID = jsonData.gameID;
@@ -133,9 +119,9 @@ export default function Landing() {
       toast.success(messageText);
 
       // after 1 second navigate to the game room
-      setTimeout(() => {
-        navigate(`/room/${gameID}?c=${password}`);
-      }, 1000);
+
+      navigate(`/room/${gameID}?c=${password}`);
+      return;
     } catch (error) {
       console.error("Error creating room:", error);
       toast.error(error.message || "Failed to create room. Please try again");
@@ -190,24 +176,16 @@ export default function Landing() {
         throw new Error("Failed to send registration message");
       }
 
-      // sleep for 3 seconds
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Get results
-      const resultsOut = await results({
+      let { Messages, Spawns, Output, Error } = await result({
+        // the arweave TXID of the message
+        message: messageResult,
+        // the arweave TXID of the process
         process: PROCESS_ID,
-        sort: "DESC",
-        limit: 1,
       });
+      console.log(Messages, Spawns, Output, Error);
+      const dataTemp = Messages[0].Data;
 
-      if (
-        !resultsOut?.edges?.length ||
-        !resultsOut.edges[0]?.node?.Messages?.length
-      ) {
-        throw new Error("Invalid response from registration");
-      }
-
-      const resultData = resultsOut.edges[0].node.Messages[0].Data;
+      const resultData = dataTemp;
       console.log("Result data:", resultData);
       // Handle response
 

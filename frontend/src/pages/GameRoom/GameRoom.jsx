@@ -144,11 +144,15 @@ const GameArea = ({
   const [gameStage, setGameStage] = useState(roomInfo.gameState); // can be "LOOKING FOR MEMBERS" || "ON-GOING" || "COMPLETED"
 
   const [currentTurn, setCurrentTurn] = useState(null);
-  const [selfCards, setSelfCards] = useState(null);
+  const [selfCards, setSelfCards] = useState([]);
 
-  const isLookingForPlayers = roomInfo.gameState;
+  const [isLookingForPlayers, setIsLookingForPlayers] = useState(
+    roomInfo.gameState
+  );
+
   const playerListRef = useRef({});
   const timeoutRef = useRef(null);
+
   async function controlGameFlow() {
     // Prevent concurrent runs
     if (isRunningRef.current) {
@@ -193,6 +197,9 @@ const GameArea = ({
       setGameStage(tempRoomStatus.gameState);
 
       if (tempRoomStatus.gameState === "ON-GOING") {
+        if (isLookingForPlayers !== "ON-GOING") {
+          setIsLookingForPlayers("ON-GOING");
+        }
         const [currentTurn, selfCards] = await Promise.all([
           GetCurrentTurnDryRun(roomInfo.gameID),
           getSelfCards(roomInfo.gameID, arweaveWindow),
@@ -201,17 +208,19 @@ const GameArea = ({
         console.log(currentTurn);
 
         if (currentTurn?.status === "success") {
-          
           setCurrentTurn(currentTurn);
         }
 
         if (selfCards?.status === "success") {
           console.log(selfCards);
-          setSelfCards(selfCards.cards);
+          const tempCardList = selfCards.cards.split("");
+
+          setSelfCards(tempCardList);
         }
       }
     } catch (error) {
       console.error("Error in game flow:", error);
+      toast.error("Some error happened. Reload page if it persists.");
     } finally {
       // Reset the running flag
       isRunningRef.current = false;
@@ -221,20 +230,146 @@ const GameArea = ({
     }
   }
 
-  // useEffect(() => {
-  //   if (!roomInfo) return;
+  const getPlayerPosition = (playerIndex, selfAddressIndex) => {
+    // Calculate relative position based on player's index relative to self
+    const positions = ["bottom", "left", "top", "right"];
+    const relativePosition = (playerIndex - selfAddressIndex + 4) % 4;
+    return positions[relativePosition];
+  };
 
-  //   // Start the initial flow
-  //   controlGameFlow();
+  const renderGameLayout = () => {
+    if (!playerList || Object.keys(playerList).length !== 4 || !selfCards) {
+      return null;
+    }
 
-  //   // Cleanup function
-  //   return () => {
-  //     if (timeoutRef.current) {
-  //       clearTimeout(timeoutRef.current);
-  //     }
-  //     isRunningRef.current = false; // Reset the running flag on cleanup
-  //   };
-  // }, [roomInfo]); // Remove gameStage from dependencies
+    const addresses = Object.keys(playerList);
+    const selfAddressIndex = addresses.indexOf(selfAddress);
+
+    return (
+      <div className='h-full flex flex-col justify-between'>
+        {/* Top player */}
+        <div className='flex justify-center mb-4 md:mb-6 lg:mb-8'>
+          {addresses.map((address, index) => {
+            if (getPlayerPosition(index, selfAddressIndex) === "top") {
+              return (
+                <div
+                  key={address}
+                  className='flex flex-col items-center gap-2 md:gap-4'>
+                  <PlayerInfo
+                    username={playerList[address]}
+                    position='top'
+                    isCurrentPlayer={currentTurn?.currentTurn === address}
+                  />
+                  <div className='flex gap-1 md:gap-2 lg:gap-3'>
+                    {[1, 2, 3, 4].map((_, cardIndex) => (
+                      <Card key={cardIndex} number={0} isHidden={true} />
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
+
+        {/* Middle section */}
+        <div className='flex-1 flex justify-between items-center px-4 md:px-8 lg:px-16'>
+          {/* Left player */}
+          <div className='flex flex-col gap-2 md:gap-4'>
+            {addresses.map((address, index) => {
+              if (getPlayerPosition(index, selfAddressIndex) === "left") {
+                return (
+                  <div key={address}>
+                    <PlayerInfo
+                      username={playerList[address]}
+                      position='left'
+                      isCurrentPlayer={currentTurn?.currentTurn === address}
+                    />
+                    <div className='flex gap-1 md:gap-2 lg:gap-3'>
+                      {[1, 2, 3, 4].map((_, cardIndex) => (
+                        <Card key={cardIndex} number={0} isHidden={true} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
+          </div>
+
+          {/* Center area */}
+          <div className='w-20 h-20 md:w-28 md:h-28 lg:w-36 lg:h-36 rounded-full bg-gray-700/50 flex items-center justify-center'>
+            <span className='text-white text-xs md:text-sm lg:text-base'>
+              Game Center
+            </span>
+          </div>
+
+          {/* Right player */}
+          <div className='flex flex-col gap-2 md:gap-4'>
+            {addresses.map((address, index) => {
+              if (getPlayerPosition(index, selfAddressIndex) === "right") {
+                return (
+                  <div key={address}>
+                    <PlayerInfo
+                      username={playerList[address]}
+                      position='right'
+                      isCurrentPlayer={currentTurn?.currentTurn === address}
+                    />
+                    <div className='flex gap-1 md:gap-2 lg:gap-3'>
+                      {[1, 2, 3, 4].map((_, cardIndex) => (
+                        <Card key={cardIndex} number={0} isHidden={true} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
+          </div>
+        </div>
+
+        {/* Bottom player (self) */}
+        <div className='flex justify-center mt-4 md:mt-6 lg:mt-8'>
+          {addresses.map((address, index) => {
+            if (getPlayerPosition(index, selfAddressIndex) === "bottom") {
+              return (
+                <div
+                  key={address}
+                  className='flex flex-col items-center gap-2 md:gap-4'>
+                  <div className='flex gap-1 md:gap-2 lg:gap-3'>
+                    {selfCards.map((cardValue, cardIndex) => (
+                      <Card key={cardIndex} number={parseInt(cardValue)} />
+                    ))}
+                  </div>
+                  <PlayerInfo
+                    username={playerList[address]}
+                    position='bottom'
+                    isCurrentPlayer={currentTurn?.currentTurn === address}
+                  />
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    if (!roomInfo) return;
+
+    // Start the initial flow
+    controlGameFlow();
+
+    // Cleanup function
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      isRunningRef.current = false; // Reset the running flag on cleanup
+    };
+  }, [roomInfo]); // Remove gameStage from dependencies
 
   // async function testScript() {
   //   const test = await getSelfCards("10", arweaveWindow);
@@ -247,71 +382,19 @@ const GameArea = ({
 
   return (
     <div className='bg-gray-800 rounded-lg p-4 lg:p-8 h-full relative'>
-      {!isLoading && isLookingForPlayers !== "LOOKING FOR MEMBERS" && (
-        <div className='h-full flex flex-col justify-between'>
-          {/* Top player */}
-          <div className='flex justify-center mb-4 md:mb-6 lg:mb-8'>
-            <div className='flex flex-col items-center gap-2 md:gap-4'>
-              <PlayerInfo {...players.find((p) => p.position === "top")} />
-              <div className='flex gap-1 md:gap-2 lg:gap-3'>
-                {players
-                  .find((p) => p.position === "top")
-                  .cards.map((card, idx) => (
-                    <Card key={idx} number={card} isHidden={true} />
-                  ))}
-              </div>
-            </div>
+      {!isLoading &&
+        isLookingForPlayers === "ON-GOING" &&
+        Object.keys(playerList).length < 4 && (
+          <div className='flex items-center justify-center h-full'>
+            <Loader />
           </div>
+        )}
 
-          {/* Middle section */}
-          <div className='flex-1 flex justify-between items-center px-4 md:px-8 lg:px-16'>
-            {/* Left player */}
-            <div className='flex flex-col gap-2 md:gap-4'>
-              <PlayerInfo {...players.find((p) => p.position === "left")} />
-              <div className='flex gap-1 md:gap-2 lg:gap-3'>
-                {players
-                  .find((p) => p.position === "left")
-                  .cards.map((card, idx) => (
-                    <Card key={idx} number={card} isHidden={true} />
-                  ))}
-              </div>
-            </div>
-
-            {/* Center area */}
-            <div className='w-20 h-20 md:w-28 md:h-28 lg:w-36 lg:h-36 rounded-full bg-gray-700/50 flex items-center justify-center'>
-              <span className='text-white text-xs md:text-sm lg:text-base'>
-                Game Center
-              </span>
-            </div>
-
-            {/* Right player */}
-            <div className='flex flex-col gap-2 md:gap-4'>
-              <PlayerInfo {...players.find((p) => p.position === "right")} />
-              <div className='flex gap-1 md:gap-2 lg:gap-3'>
-                {players
-                  .find((p) => p.position === "right")
-                  .cards.map((card, idx) => (
-                    <Card key={idx} number={card} isHidden={true} />
-                  ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom player */}
-          <div className='flex justify-center mt-4 md:mt-6 lg:mt-8'>
-            <div className='flex flex-col items-center gap-2 md:gap-4'>
-              <div className='flex gap-1 md:gap-2 lg:gap-3'>
-                {players
-                  .find((p) => p.position === "bottom")
-                  .cards.map((card, idx) => (
-                    <Card key={idx} number={card} />
-                  ))}
-              </div>
-              <PlayerInfo {...players.find((p) => p.position === "bottom")} />
-            </div>
-          </div>
-        </div>
-      )}
+      {!isLoading &&
+        isLookingForPlayers === "ON-GOING" &&
+        Object.keys(playerList).length === 4 &&
+        selfCards.length > 2 &&
+        renderGameLayout()}
 
       {!isLoading &&
         isLookingForPlayers === "LOOKING FOR MEMBERS" &&
